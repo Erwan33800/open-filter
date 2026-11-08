@@ -32,6 +32,17 @@ public:
     void getStateInformation (juce::MemoryBlock&) override;
     void setStateInformation (const void*, int) override;
 
+    // Tous les paramètres (bandes, globaux, macros). Les valeurs lues par le thread audio passent par
+    // getRawParameterValue(), atomique : aucun verrou.
+    juce::AudioProcessorValueTreeState apvts;
+
+    // Réglages d'interface sauvegardés avec le set (taille de fenêtre, analyseur, assignations des macros...),
+    // sous forme de JSON fourni par la page. Thread message uniquement.
+    juce::String getUiState() const        { return uiState; }
+    void setUiState (const juce::String& json) { uiState = json; }
+
 private:
+    juce::String uiState;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OpenFilterProcessor)
 };

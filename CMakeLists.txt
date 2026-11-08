@@ -21,7 +21,8 @@ list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
 
 # --- DSP : C++ pur, sans JUCE ---
 add_library(OpenFilterDsp STATIC
-    Source/dsp/FilterDesign.cpp)
+    Source/dsp/FilterDesign.cpp
+    Source/params/ParamSpec.cpp)
 target_include_directories(OpenFilterDsp PUBLIC Source)
 target_compile_features(OpenFilterDsp PUBLIC cxx_std_20)
 if(NOT MSVC)
@@ -32,7 +33,8 @@ enable_testing()
 include(Catch)
 add_executable(OpenFilterTests
     tests/dsp/test_skeleton.cpp
-    tests/dsp/test_filter_design.cpp)
+    tests/dsp/test_filter_design.cpp
+    tests/dsp/test_params.cpp)
 target_link_libraries(OpenFilterTests PRIVATE OpenFilterDsp Catch2::Catch2WithMain)
 catch_discover_tests(OpenFilterTests)
 
@@ -73,6 +75,7 @@ juce_add_plugin(OpenFilter
 juce_add_binary_data(OpenFilterUI SOURCES ui/openfilter_ui.html)
 
 target_sources(OpenFilter PRIVATE
+    Source/params/ParameterLayout.cpp
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp)
 

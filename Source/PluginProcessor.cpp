@@ -1,12 +1,14 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "params/ParameterLayout.h"
 #include "dsp/Info.h"
 
 OpenFilterProcessor::OpenFilterProcessor()
     : AudioProcessor (BusesProperties()
                           .withInput  ("Input",     juce::AudioChannelSet::stereo(), true)
                           .withOutput ("Output",    juce::AudioChannelSet::stereo(), true)
-                          .withInput  ("Sidechain", juce::AudioChannelSet::stereo(), false))
+                          .withInput  ("Sidechain", juce::AudioChannelSet::stereo(), false)),
+      apvts (*this, nullptr, "OpenFilterParams", openfilter::createParameterLayout())
 {
 }
 
@@ -52,17 +54,33 @@ void OpenFilterProcessor::processBlock (juce::AudioBuffer<float>&, juce::MidiBuf
 bool OpenFilterProcessor::hasEditor() const { return true; }
 juce::AudioProcessorEditor* OpenFilterProcessor::createEditor() { return new OpenFilterEditor (*this); }
 
+// État sauvegardé avec le set : <OpenFilterState version="1"> contient l'APVTS (<OpenFilterParams>)
+// et, dans un nœud séparé, les réglages d'interface (<UI json="...">). Le numéro de version permettra
+// de migrer d'anciens états si le format change.
 void OpenFilterProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    // État minimal versionné. Les paramètres (APVTS) arrivent à l'étape 3.
     juce::XmlElement xml ("OpenFilterState");
     xml.setAttribute ("version", 1);
+
+    if (auto params = apvts.copyState().createXml())
+        xml.addChildElement (params.release());
+
+    xml.createNewChildElement ("UI")->setAttribute ("json", uiState);
     copyXmlToBinary (xml, destData);
 }
 
 void OpenFilterProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
-    juce::ignoreUnused (data, sizeInBytes);
+    const auto xml = getXmlFromBinary (data, sizeInBytes);
+
+    if (xml == nullptr || ! xml->hasTagName ("OpenFilterState"))
+        return; // état inconnu ou corrompu : on garde les réglages courants
+
+    if (const auto* params = xml->getChildByName (apvts.state.getType().toString()))
+        apvts.replaceState (juce::ValueTree::fromXml (*params));
+
+    if (const auto* ui = xml->getChildByName ("UI"))
+        uiState = ui->getStringAttribute ("json");
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()

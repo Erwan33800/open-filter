@@ -87,7 +87,10 @@ docs/               spec.md, backlog.md
 
 ## Paramètres
 
-- IDs stables `b{n}_{param}`, n de 1 à 24 : `freq gain q type slope place on dynRange thresh ratio attack release used`. Globaux : `out_gain`, `bypass`, `phase_invert`.
+- Définition unique dans `Source/params/ParamSpec.cpp` (C++ pur, testé) ; `ParameterLayout.cpp` en construit l'APVTS. 419 paramètres : 24 bandes x 17, 3 globaux, 8 macros.
+- IDs stables `b{n}_{param}`, n de 1 à 24 : `freq gain q type slope place on dynRange thresh threshAuto ratio attack attackAuto release releaseAuto dynSrc used`. Globaux : `out_gain`, `bypass`, `phase_invert`. Macros : `macro1` à `macro8` (0 à 1) ; leurs assignations (quel réglage, de quelle valeur à quelle valeur) ne sont pas des paramètres : elles vivent dans l'état d'interface.
+- `used`, `threshAuto`, `attackAuto`, `releaseAuto` ne sont pas automatisables (ils restent sauvegardés).
+- Les choix `type`, `slope`, `place` listent déjà les valeurs réservées pour plus tard (Tilt, All Pass, Brickwall, Left, Right) : un choix ajouté au milieu décalerait les valeurs automatisées. Toute nouvelle valeur s'ajoute à la fin. Un test gèle les identifiants et les listes.
 - `juce::ParameterID` en version 1. **Ne jamais renommer ni supprimer un ID publié** (casse l'automation dans Live).
 - Noms dans Live : « B3 Freq », « B3 Gain »… Fréquence logarithmique 10 Hz à 30 kHz.
 - L'état sauvegarde l'APVTS plus les réglages d'interface (taille de fenêtre, analyseur) dans un nœud séparé.
