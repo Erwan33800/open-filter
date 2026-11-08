@@ -117,13 +117,35 @@ Le projet vit dans WSL ; Visual Studio compile mal depuis un chemin `\wsl.localh
 
 Une étape n'est terminée que si : tests du DSP OK, compilation CI OK, pluginval OK, commit.
 
+## Écouter et mesurer sans Live : `of_render`
+
+Outil en ligne de commande qui applique l'égaliseur à un fichier WAV avec exactement le même code C++ que le plugin (`Source/dsp/EqEngine`). Compilé avec les tests (`cmake --build build-tests`).
+
+```bash
+# signaux intégrés : gen:sweep (balayage 20 Hz - 20 kHz, 8 s) et gen:pink (bruit rose, 10 s), ou un WAV (16/24/32 bits, float)
+./build-tests/of_render gen:sweep out/sweep_eq.wav --band lowcut,80,0,0.71,24 --band bell,1000,8,2 --gain -2 --response out/courbe.csv
+# bande : type,freq,gain,q[,pente[,placement]]  (types : bell lowshelf highshelf lowcut highcut notch bandpass ; placements : stereo left right mid side)
+```
+
+Le WAV de sortie est en float 32 bits (pas d'écrêtage). `--response` écrit la courbe numérique et la référence analogique. Les fichiers générés vont dans `out/` (ignoré par git), visible depuis Windows dans `\\wsl.localhost\Ubuntu\home\erwan_lp\projects\open-plugin\open-filter\out`.
+
+## Moteur (`Source/dsp/EqEngine`, étape 4 faite)
+
+- 24 bandes en série, tout en `double` (conversion float -> double au début du bloc, retour à la fin).
+- Lissage ~20 ms : fréquence et Q en échelle log, gain linéaire ; les coefficients se recalculent tous les 32 échantillons, seulement si une valeur a bougé. Un changement de type, de pente ou de placement s'applique d'un coup (états remis à zéro) : pas de fondu, à améliorer si l'automation de ces réglages pose problème.
+- Activer, désactiver ou supprimer une bande, et le bypass global : fondu de 20 ms. Bypass complet = sortie identique à l'entrée au bit près, états remis à zéro.
+- Mid/Side : conversion en `double`, seulement si une bande active utilise Mid ou Side (sinon le tampon n'est pas touché). Left et Right sont déjà gérés par le moteur (réservés dans l'interface, v1). Sur une piste mono, toutes les bandes traitent l'unique canal.
+- Rien d'actif, gain de sortie à 0 dB, pas de bypass : le tampon n'est pas modifié (bit exact).
+- Gain de sortie (avec l'inversion de phase) lissé échantillon par échantillon.
+- Le processeur JUCE ne fait que lire les paramètres atomiques et les passer au moteur (`pushParametersToEngine`). Les macros, la dynamique et le sidechain ne sont pas encore branchés (étape 5 et interface). Les types réservés Tilt et All Pass mettent la bande hors service.
+
 ## Ordre de développement
 
 Chaque étape finit par : compilation OK, tests OK, pluginval OK, un commit, validation d'Erwan dans Live avant la suivante.
 
 0. Spec v2 et maquette HTML de l'interface (aux couleurs d'Open Groove), validées dans Chrome.
 1. Squelette : CMake + JUCE + Catch2, effet stéréo passe-plat avec sidechain, WebView2 affichant la page, script d'installation.
-2. DSP des filtres, 3. Paramètres (APVTS), 4. Moteur (stéréo, M/S, lissage, bypass), 5. Dynamique et sidechain, 6. Analyseur, 7. Courbe et gestes branchés au plugin, 8. Panneau de bande, barre du bas, undo, presets, 9. Passe finale (CPU, pluginval, live complet).
+2. DSP des filtres (fait), 3. Paramètres (APVTS) (fait), 4. Moteur (stéréo, M/S, lissage, bypass) (fait), 5. Dynamique et sidechain, 6. Analyseur, 7. Courbe et gestes branchés au plugin, 8. Panneau de bande, barre du bas, undo, presets, 9. Passe finale (CPU, pluginval, live complet).
 
 ## Git
 
