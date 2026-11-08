@@ -22,6 +22,7 @@ list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
 # --- DSP : C++ pur, sans JUCE ---
 add_library(OpenFilterDsp STATIC
     Source/dsp/FilterDesign.cpp
+    Source/dsp/EqEngine.cpp
     Source/params/ParamSpec.cpp)
 target_include_directories(OpenFilterDsp PUBLIC Source)
 target_compile_features(OpenFilterDsp PUBLIC cxx_std_20)
@@ -34,9 +35,14 @@ include(Catch)
 add_executable(OpenFilterTests
     tests/dsp/test_skeleton.cpp
     tests/dsp/test_filter_design.cpp
-    tests/dsp/test_params.cpp)
+    tests/dsp/test_params.cpp
+    tests/dsp/test_eq_engine.cpp)
 target_link_libraries(OpenFilterTests PRIVATE OpenFilterDsp Catch2::Catch2WithMain)
 catch_discover_tests(OpenFilterTests)
+
+# Outil d'écoute hors ligne : applique l'égaliseur à un fichier WAV avec le même code que le plugin.
+add_executable(of_render tools/render/main.cpp)
+target_link_libraries(of_render PRIVATE OpenFilterDsp)
 
 if(NOT OPENFILTER_PLUGIN)
     return()

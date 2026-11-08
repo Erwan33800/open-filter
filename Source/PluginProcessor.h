@@ -1,6 +1,8 @@
 #pragma once
 
+#include <array>
 #include <juce_audio_processors/juce_audio_processors.h>
+#include "dsp/EqEngine.h"
 
 // Effet audio Open Filter. Étape 1 : passe-plat. Entrée et sortie mono ou stéréo,
 // plus un bus d'entrée « Sidechain » stéréo optionnel (menu Sidechain du device dans Live).
@@ -42,6 +44,22 @@ public:
     void setUiState (const juce::String& json) { uiState = json; }
 
 private:
+    // Pointeurs vers les valeurs atomiques des paramètres, récupérés une fois : lecture sans verrou dans processBlock.
+    struct BandParams
+    {
+        std::atomic<float>* used = nullptr; std::atomic<float>* on = nullptr;
+        std::atomic<float>* freq = nullptr; std::atomic<float>* gain = nullptr; std::atomic<float>* q = nullptr;
+        std::atomic<float>* type = nullptr; std::atomic<float>* slope = nullptr; std::atomic<float>* place = nullptr;
+    };
+
+    void pushParametersToEngine() noexcept;
+
+    std::array<BandParams, openfilter::dsp::EqEngine::kNumBands> bandParams;
+    std::atomic<float>* outGainParam = nullptr;
+    std::atomic<float>* bypassParam = nullptr;
+    std::atomic<float>* phaseInvertParam = nullptr;
+
+    openfilter::dsp::EqEngine engine;
     juce::String uiState;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OpenFilterProcessor)
