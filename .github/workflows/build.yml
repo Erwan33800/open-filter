@@ -43,7 +43,8 @@ jobs:
       - name: pluginval (niveau 10)
         shell: pwsh
         run: |
-          Invoke-WebRequest "https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_Windows.zip" -OutFile "$env:RUNNER_TEMP/pluginval.zip"
+          # GitHub renvoie parfois une erreur 5xx passagère : on réessaie le téléchargement.
+          Invoke-WebRequest "https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_Windows.zip" -OutFile "$env:RUNNER_TEMP/pluginval.zip" -MaximumRetryCount 5 -RetryIntervalSec 10
           Expand-Archive "$env:RUNNER_TEMP/pluginval.zip" -DestinationPath "$env:RUNNER_TEMP/pluginval" -Force
           # pluginval.exe est une application graphique : PowerShell ne l'attend pas avec « & »
           # (le code de sortie resterait vide). Start-Process -Wait -PassThru attend et rend le vrai code.
