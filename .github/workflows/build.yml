@@ -45,8 +45,12 @@ jobs:
         run: |
           Invoke-WebRequest "https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_Windows.zip" -OutFile "$env:RUNNER_TEMP/pluginval.zip"
           Expand-Archive "$env:RUNNER_TEMP/pluginval.zip" -DestinationPath "$env:RUNNER_TEMP/pluginval" -Force
-          & "$env:RUNNER_TEMP/pluginval/pluginval.exe" --strictness-level 10 --validate-in-process --skip-gui-tests --validate "build/OpenFilter_artefacts/Release/VST3/Open Filter.vst3"
-          if ($LASTEXITCODE -ne 0) { throw "pluginval a échoué (code $LASTEXITCODE)" }
+          # pluginval.exe est une application graphique : PowerShell ne l'attend pas avec « & »
+          # (le code de sortie resterait vide). Start-Process -Wait -PassThru attend et rend le vrai code.
+          $plugin = (Resolve-Path "build/OpenFilter_artefacts/Release/VST3/Open Filter.vst3").Path
+          $p = Start-Process -FilePath "$env:RUNNER_TEMP/pluginval/pluginval.exe" -Wait -PassThru -NoNewWindow `
+                 -ArgumentList @("--strictness-level","10","--validate-in-process","--skip-gui-tests","--validate","`"$plugin`"")
+          if ($p.ExitCode -ne 0) { throw "pluginval a échoué (code $($p.ExitCode))" }
 
       - name: Paquet
         shell: pwsh
