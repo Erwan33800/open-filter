@@ -1,0 +1,11 @@
+build/
+build-tests/
+out/
+tools/
+.vs/
+*.user
+*.suo
+.DS_Store
+CMakeUserPresets.json
+# brouillon du POC à la racine (non versionné, à supprimer en fin de projet)
+/maquette/

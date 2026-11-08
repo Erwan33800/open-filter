@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Open Filter</title>
+<style>
+/* Interface Open Filter. Tokens repris d'Open Groove (plugin-head.html).
+   Police Manrope (SIL OFL) intégrée en base64 par build_ui.py à la place du marqueur __MANROPE__ : le WebView est hors ligne. */
+@font-face{font-family:"Manrope";font-style:normal;font-weight:200 800;font-display:swap;src:url(data:font/woff2;base64,__MANROPE__) format("woff2")}
+:root{
+  --bg:#151516; --panel:#1d1d1f; --tile:#2a2a2d; --tile-hi:#343438; --line:#2c2c30;
+  --fg:#f1f0ee; --dim:#a4a4aa; --faint:#6f6f77;
+  --accent:#5fd4b8; --drop:#ff6b57;
+  --pl-st:#f5d54d; --pl-mid:#6fd98a; --pl-side:#6aa8ff; --pl-l:#f1f0ee; --pl-r:#ff6b57;
+  --sans:"Manrope","Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,sans-serif;
+  --mono:"Cascadia Mono",Consolas,ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;min-width:980px;min-height:620px;overflow:hidden;background:var(--bg);color:var(--fg);font:500 13px/1.35 var(--sans);-webkit-font-smoothing:antialiased;user-select:none}
+button{font:inherit;color:inherit;margin:0;cursor:pointer}
+[hidden]{display:none!important}
+:focus-visible{outline:1px solid var(--fg);outline-offset:1px}
+.win{height:100%;display:grid;grid-template-rows:54px minmax(0,1fr) 74px}
+.lab{font-size:11px;font-weight:600;color:var(--faint);white-space:nowrap}
+
+/* en-tête */
+.top{display:flex;align-items:center;gap:12px;padding:0 14px;min-width:0}
+.logo{display:flex;align-items:center;gap:9px;font-weight:800;letter-spacing:.07em;font-size:14px;width:172px;flex:none}
+.mark{width:26px;height:26px;border-radius:6px;border:1.8px solid var(--accent);display:grid;place-items:center}
+.mark svg{width:16px;height:16px;stroke:var(--accent);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.bar{flex:1;min-width:0;height:32px;border-radius:8px;background:var(--panel);display:flex;align-items:center;gap:10px;padding:0 12px;font-size:12px;color:var(--dim)}
+.bar b{color:var(--fg);font-weight:600}
+.bar .sd{margin-left:auto;font:11px var(--mono);color:var(--faint)}
+.tabs{display:flex;gap:2px;padding:3px;border-radius:9px;background:var(--panel)}
+.tab{border:0;background:none;color:var(--faint);height:28px;padding:0 13px;border-radius:7px;font-weight:700;font-size:11px;letter-spacing:.09em;text-transform:uppercase;white-space:nowrap}
+.tab:hover{color:var(--fg)}
+.tab[aria-selected="true"]{background:var(--tile-hi);color:var(--fg)}
+.ib{width:32px;height:32px;border:0;background:var(--panel);border-radius:8px;display:grid;place-items:center;color:var(--dim);padding:0}
+.ib:hover:not(:disabled){color:var(--fg);background:var(--tile)}
+.ib:disabled{opacity:.3;cursor:default}
+.ib svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.ib[aria-pressed="true"]{color:var(--accent)}
+.sq{display:flex;align-items:center;gap:6px}
+
+/* écran de courbe */
+.mid{display:grid;grid-template-rows:minmax(0,1fr) auto;padding:0 14px 10px;min-height:0}
+.mid>.stage{grid-row:1}
+.stage{position:relative;background:var(--panel);border-radius:10px;min-height:0;overflow:hidden}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#cv{cursor:crosshair}
+.hint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:var(--faint);font-size:12px;pointer-events:none;text-align:center;transition:opacity .3s}
+
+/* panneau flottant de la bande */
+.bp{grid-row:2;margin-top:10px;display:flex;flex-direction:column;gap:10px;padding:10px 14px;border-radius:10px;background:var(--panel);border-left:3px solid var(--bc,var(--line))}
+.bp.empty{flex-direction:row;align-items:center;gap:14px;min-height:64px;color:var(--dim);font-size:12.5px}
+.bp.empty b{color:var(--fg);font-weight:600}
+.brow{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.brow2{border-top:1px solid var(--line);padding-top:10px}
+.btitle{display:flex;flex-direction:column;gap:1px;min-width:80px;align-self:center}
+.btitle b{font-size:13px;color:var(--bc,var(--fg))}
+.btitle span{font-size:11px;color:var(--dim)}
+.bp .fld{display:flex;flex-direction:column;gap:4px}
+.bp .fld .lab{font-size:11.5px;color:var(--dim)}
+.bp .sep{width:1px;align-self:stretch;background:var(--line)}
+.bp .grow{flex:1}
+.bp .vb{background:var(--tile)}
+.bp .vb:hover,.bp .vb.drag{background:var(--tile-hi)}
+.bp .tg{background:var(--tile)}
+.bp .tg:hover{background:var(--tile-hi)}
+.bp .tg[aria-pressed="true"]{background:var(--accent);color:#101012}
+.vb{position:relative;height:28px;min-width:70px;white-space:nowrap;padding:0 11px;border-radius:7px;background:var(--tile);display:flex;align-items:center;justify-content:center;font:500 12px var(--mono);cursor:ns-resize;overflow:hidden;touch-action:none;color:var(--fg);border:0}
+.vb:hover,.vb.drag{background:var(--bg)}
+.vb.sel{cursor:pointer;justify-content:space-between;gap:10px;min-width:118px;font:600 12px var(--sans)}
+.vb.sel svg{width:10px;height:10px;stroke:var(--dim);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.vb:disabled{opacity:.35;cursor:default}
+.segc{display:flex;gap:2px;padding:2px;border-radius:7px;background:var(--bg)}
+.segc button{border:0;background:none;height:24px;padding:0 10px;border-radius:5px;color:var(--faint);font-weight:600;font-size:12px}
+.segc button:hover{color:var(--fg)}
+.segc button[aria-checked="true"]{background:var(--c,var(--accent));color:#101012}
+.tg{border:0;height:28px;padding:0 11px;border-radius:7px;background:var(--tile);color:var(--dim);font-weight:600;font-size:12px}
+.tg:hover{background:var(--bg);color:var(--fg)}
+.tg[aria-pressed="true"]{background:var(--accent);color:#101012}
+.tg.del:hover{color:var(--drop)}
+.menu{position:absolute;min-width:210px;padding:4px;border-radius:9px;background:var(--tile-hi);box-shadow:0 10px 28px rgba(0,0,0,.55);z-index:30;display:grid;gap:1px}
+.mi{border:0;background:none;height:28px;border-radius:6px;padding:0 10px;display:flex;justify-content:space-between;align-items:center;gap:14px;font-size:12.5px;font-weight:600;text-align:left}
+.mi small{font:10.5px var(--mono);color:var(--faint);font-weight:400}
+.mi:hover{background:var(--tile)}
+.mi[aria-checked="true"]{color:var(--accent)}
+.mi.danger:hover{color:var(--drop)}
+.msep{height:1px;background:var(--line);margin:3px 4px}
+
+/* sélecteur de presets */
+button.bar{border:0;text-align:left;cursor:pointer}
+button.bar:hover{background:var(--tile)}
+.pm{position:absolute;top:48px;z-index:40;display:grid;grid-template-columns:repeat(4,1fr);gap:4px 10px;padding:10px;border-radius:10px;background:var(--tile-hi);box-shadow:0 12px 32px rgba(0,0,0,.6)}
+.pcol{display:flex;flex-direction:column;gap:2px;min-width:0}
+.ptitle{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);padding:2px 10px 6px}
+.pi{border:0;background:none;border-radius:7px;padding:6px 10px;text-align:left;display:flex;flex-direction:column;gap:1px}
+.pi b{font-size:12.5px;font-weight:600}
+.pi small{font-size:11px;line-height:1.3;color:var(--faint);font-weight:500}
+.pi:hover{background:var(--tile)}
+.pi[aria-checked="true"] b{color:var(--accent)}
+.pfoot{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);margin-top:4px;padding:8px 10px 0;font-size:11px;color:var(--faint)}
+
+/* vue Macros */
+.mac{padding:16px;overflow:auto;display:flex;flex-direction:column;gap:12px}
+.machead{display:flex;align-items:center;gap:12px;color:var(--dim);font-size:12px}
+.machead b{color:var(--fg);font-weight:600}
+.macgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.mt{background:var(--tile);border-radius:10px;padding:10px;display:grid;grid-template-columns:34px minmax(0,1fr);gap:12px;min-height:200px}
+.mt.empty .mn{color:var(--faint)}
+.fd{position:relative;border-radius:8px;background:var(--bg);cursor:ns-resize;overflow:hidden;touch-action:none}
+.fdf{position:absolute;left:0;right:0;bottom:0;background:var(--accent);opacity:.9}
+.fd:hover .fdf{opacity:1}
+.mb{display:flex;flex-direction:column;gap:6px;min-width:0}
+.mh{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.mn{font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mv{font:11px var(--mono);color:var(--dim)}
+.as{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--dim)}
+.as .al{flex:0 0 auto;white-space:nowrap}
+.as .vb{flex:1 1 0;height:24px;min-width:0;padding:0 4px;font-size:11px;background:var(--bg)}
+.as .vb:hover,.as .vb.drag{background:var(--panel)}
+.as .x{border:0;background:none;color:var(--faint);padding:0 3px;font-size:12px}
+.as .x:hover{color:var(--drop)}
+.adds{display:flex;gap:4px;flex-wrap:wrap;margin-top:auto}
+.adds button{border:0;background:var(--bg);color:var(--dim);height:24px;border-radius:6px;padding:0 8px;font-size:11px;font-weight:600}
+.adds button:hover:not(:disabled){color:var(--fg);background:var(--panel)}
+.adds button:disabled{opacity:.3;cursor:default}
+
+/* barre du bas */
+.bot{margin:0 14px 12px;padding:0 16px;border-radius:10px;background:var(--panel);display:flex;align-items:center;gap:22px;min-width:0}
+.grp{display:flex;flex-direction:column;gap:6px;min-width:0}
+.gl{font-size:11.5px;font-weight:600;color:var(--dim);white-space:nowrap;display:flex;align-items:center;gap:8px}
+.gl b{font:500 11.5px var(--mono);color:var(--fg)}
+.row{display:flex;align-items:center;gap:6px}
+.grow{flex:1}
+.bot .segc button{height:30px;padding:0 13px;font-size:12.5px;color:var(--dim)}
+.bot .segc button:hover{color:var(--fg)}
+.bot .segc button[aria-checked="true"]{color:#101012}
+.bot .vb,.bot .tg{height:32px;font-size:12.5px}
+.bot .vb{min-width:84px}
+.bot .tg{padding:0 14px}
+.ib.sm{width:34px;height:34px;background:var(--bg)}
+.ib.sm:hover{background:var(--tile)}
+.ib[aria-expanded="true"]{color:var(--accent)}
+.meterg{width:200px}
+.meter{height:18px;position:relative;border-radius:5px;background:var(--bg);overflow:hidden}
+.meter canvas{position:absolute;inset:0;width:100%;height:100%}
+.mticks{position:relative;height:11px;font:9.5px var(--mono);color:var(--dim)}
+.mticks span{position:absolute;top:0;transform:translateX(-50%)}
+.clip{width:9px;height:9px;border-radius:50%;background:var(--tile-hi);display:inline-block}
+.clip.on{background:var(--drop)}
+#helpBtn{font-weight:700;font-size:14px;background:var(--bg)}
+
+/* popovers au-dessus de la barre du bas */
+.pop{position:absolute;z-index:50;padding:14px;border-radius:10px;background:var(--tile-hi);box-shadow:0 12px 32px rgba(0,0,0,.6);display:flex;flex-direction:column;gap:12px}
+.pop .prow{display:flex;align-items:center;justify-content:space-between;gap:20px}
+.pop .segc{background:var(--bg)}
+.pop .segc button{height:28px;padding:0 12px;font-size:12.5px;color:var(--dim)}
+.pop .segc button[aria-checked="true"]{color:#101012}
+.pop.help{width:440px}
+.pop dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:6px 18px;font-size:12.5px}
+.pop dt{font-weight:600;color:var(--fg);white-space:nowrap}
+.pop dd{margin:0;color:var(--dim)}
+@media (max-width:1100px){.bot{gap:14px;padding:0 12px}.meterg{width:150px}.bot .segc button{padding:0 9px}}
+.ib.wide{width:auto;padding:0 12px;gap:7px;display:flex;align-items:center;font-size:12px;font-weight:600}
+#bypass[aria-pressed="true"]{color:var(--drop)}
+</style>
+</head>
+<body>
+<div class="win">
+  <header class="top">
+    <div class="logo"><div class="mark"><svg viewBox="0 0 24 24"><path d="M2 14c4 0 4-8 8-8s3 12 7 12 3-6 5-6"/></svg></div>OPEN FILTER</div>
+    <button class="bar" id="presetBtn" title="Choisir un preset"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6f6f77" stroke-width="1.7" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg><b id="presetName">Init</b><span>·</span><span id="bandCount">0 bande</span><span class="sd">48 kHz · zéro latence</span></button>
+    <div class="tabs" role="tablist"><button class="tab" id="tCurve" role="tab" aria-selected="true">Courbe</button><button class="tab" id="tMac" role="tab" aria-selected="false">Macros</button></div>
+    <div class="sq">
+      <button class="ib" id="undo" title="Annuler (Ctrl+Z)"><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/></svg></button>
+      <button class="ib" id="redo" title="Rétablir (Ctrl+Y)"><svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 000 12h3"/></svg></button>
+      <button class="ib wide" id="bypass" aria-pressed="false" title="Bypass global : écouter le son sans l'égaliseur"><svg viewBox="0 0 24 24"><path d="M12 3v9"/><path d="M6.4 6.4a8 8 0 1011.2 0"/></svg><span>Bypass</span></button>
+    </div>
+  </header>
+
+  <main class="mid">
+    <div class="stage" id="stage">
+      <canvas id="cv"></canvas>
+      <div class="hint" id="hint">Double-clic sur la courbe pour créer une bande</div>
+      <div class="menu" id="menu" hidden></div>
+    </div>
+    <section class="stage mac" id="macv" hidden>
+      <div class="machead" style="flex-direction:column;align-items:flex-start;gap:4px">
+        <span><b>Une macro</b> est un potard unique qui déplace plusieurs réglages à la fois. Dans Live, chaque macro apparaît comme un paramètre « Macro 1 à 8 » : tu peux l'automatiser ou la mapper sur ton APC40.</span>
+        <span id="macsel"></span>
+      </div>
+      <div class="macgrid" id="macgrid"></div>
+    </section>
+    <div class="bp" id="bp"></div>
+  </main>
+  <div class="pm" id="pm" hidden></div>
+
+  <footer class="bot">
+    <div class="grp"><span class="gl">Échelle de gain</span><div class="segc" id="scale" role="radiogroup" aria-label="Échelle de gain de la courbe"></div></div>
+    <div class="grp"><span class="gl">Analyseur de spectre</span>
+      <div class="row"><div class="segc" id="spec" role="radiogroup" aria-label="Spectres affichés"></div>
+      <button class="ib sm" id="anBtn" aria-haspopup="true" title="Réglages de l'analyseur"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg></button></div></div>
+    <div class="grow"></div>
+    <div class="grp"><span class="gl">Phase de sortie</span><button class="tg" id="phase" aria-pressed="false" title="Inverser la polarité de la sortie (Φ)">Φ&nbsp; Inverser</button></div>
+    <div class="grp"><span class="gl">Gain de sortie</span><button class="vb" id="outg" title="Glisser, molette ou double-clic pour remettre à 0 dB"></button></div>
+    <div class="grp meterg"><span class="gl">Niveau de sortie <b id="peakRead">—</b><i class="clip" id="clip" title="Dépassement de 0 dBFS"></i></span>
+      <div class="meter"><canvas id="meter"></canvas></div><div class="mticks" id="mticks"></div></div>
+    <button class="ib" id="helpBtn" aria-haspopup="true" title="Aide : gestes et raccourcis" aria-label="Aide">?</button>
+  </footer>
+</div>
+<div class="pop" id="pAn" hidden>
+  <div class="prow"><span class="gl">Retombée des pics</span><div class="segc" id="fall" role="radiogroup"></div></div>
+  <div class="prow"><span class="gl">Plage verticale</span><div class="segc" id="drng" role="radiogroup"></div></div>
+  <div class="prow"><span class="gl">Inclinaison d'affichage</span><button class="vb" id="tilt" title="Compense la pente naturelle du spectre (4,5 dB/oct = bruit rose à plat)"></button></div>
+</div>
+<div class="pop help" id="pHelp" hidden>
+  <div class="ptitle" style="padding-left:0">Gestes sur la courbe</div>
+  <dl>
+    <dt>Double-clic sur le fond</dt><dd>Créer une bande</dd>
+    <dt>Glisser un nœud</dt><dd>Fréquence et gain</dd>
+    <dt>Maj + glisser</dt><dd>Réglage fin</dd>
+    <dt>Molette sur un nœud</dt><dd>Q (ou pente d'un filtre coupe-bas / coupe-haut)</dd>
+    <dt>Alt + clic sur un nœud</dt><dd>Activer / bypass de la bande</dd>
+    <dt>Clic droit sur un nœud</dt><dd>Menu : type, placement, dynamique, supprimer</dd>
+    <dt>Suppr</dt><dd>Supprimer la bande sélectionnée</dd>
+    <dt>Ctrl + Z / Ctrl + Y</dt><dd>Annuler / rétablir</dd>
+    <dt>Double-clic sur une valeur</dt><dd>Remettre la valeur par défaut</dd>
+  </dl>
+</div>
+
+<script>

@@ -1,0 +1,107 @@
+name: Build
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  # Tests du DSP seuls (sans JUCE) : rapides, à chaque push.
+  dsp-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configuration
+        run: cmake -B build-tests -DOPENFILTER_PLUGIN=OFF -DCMAKE_BUILD_TYPE=Release
+      - name: Compilation
+        run: cmake --build build-tests --parallel
+      - name: Tests
+        run: ctest --test-dir build-tests --output-on-failure
+
+  windows:
+    runs-on: windows-2022
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: SDK WebView2 (NuGet)
+        shell: pwsh
+        run: nuget install Microsoft.Web.WebView2 -Version 1.0.1901.177 -OutputDirectory "$env:RUNNER_TEMP/nuget"
+
+      - name: Configuration
+        shell: pwsh
+        run: |
+          $loc = "$env:RUNNER_TEMP/nuget" -replace '\\','/'
+          cmake -B build -G "Visual Studio 17 2022" -A x64 "-DJUCE_WEBVIEW2_PACKAGE_LOCATION=$loc"
+
+      - name: Compilation
+        run: cmake --build build --config Release --target OpenFilter_VST3 OpenFilter_Standalone OpenFilterTests --parallel
+
+      - name: Tests
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: pluginval (niveau 10)
+        shell: pwsh
+        run: |
+          Invoke-WebRequest "https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_Windows.zip" -OutFile "$env:RUNNER_TEMP/pluginval.zip"
+          Expand-Archive "$env:RUNNER_TEMP/pluginval.zip" -DestinationPath "$env:RUNNER_TEMP/pluginval" -Force
+          & "$env:RUNNER_TEMP/pluginval/pluginval.exe" --strictness-level 10 --validate-in-process --skip-gui-tests --validate "build/OpenFilter_artefacts/Release/VST3/Open Filter.vst3"
+          if ($LASTEXITCODE -ne 0) { throw "pluginval a échoué (code $LASTEXITCODE)" }
+
+      - name: Paquet
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force out | Out-Null
+          Copy-Item -Recurse "build/OpenFilter_artefacts/Release/VST3/Open Filter.vst3" out/
+          Copy-Item "build/OpenFilter_artefacts/Release/Standalone/Open Filter.exe" out/
+          Copy-Item README.md out/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OpenFilter-Windows
+          path: out
+
+  macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configuration
+        run: cmake -B build -G Xcode -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+      - name: Compilation
+        run: cmake --build build --config Release --target OpenFilter_VST3 OpenFilter_AU -- -quiet
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OpenFilter-macOS
+          path: |
+            build/OpenFilter_artefacts/Release/VST3/Open Filter.vst3
+            build/OpenFilter_artefacts/Release/AU/Open Filter.component
+
+  release:
+    # Publie les fichiers prêts à installer sur la page « Releases » du dépôt (version « latest »)
+    if: github.ref == 'refs/heads/main'
+    needs: [dsp-tests, windows, macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dl
+
+      - name: Archives
+        run: |
+          cd dl/OpenFilter-Windows && zip -qr ../../OpenFilter-Windows.zip . && cd ../..
+          cd dl/OpenFilter-macOS && zip -qr ../../OpenFilter-macOS.zip . && cd ../..
+          ls -la *.zip
+
+      - name: Release « latest »
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest OpenFilter-Windows.zip OpenFilter-macOS.zip \
+            --target "${{ github.sha }}" \
+            --title "Open Filter (dernière version)" \
+            --notes "Compilé automatiquement depuis le commit ${{ github.sha }}. Télécharge **OpenFilter-Windows.zip** (ou **OpenFilter-macOS.zip**), puis suis la section Installer du README." \
+            --latest
