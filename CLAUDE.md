@@ -76,7 +76,9 @@ docs/               spec.md, backlog.md
 
 ## DSP
 
-- Coefficients RBJ Audio EQ Cookbook, avec correction près de Nyquist (Vicanek, « Matched Second Order Digital Filters »), écart < 0,1 dB jusqu'à 20 kHz à 44,1 kHz.
+- Coefficients (`Source/dsp/FilterDesign.cpp`, étape 2 faite) : prototypes analogiques du RBJ Audio EQ Cookbook, ramenés en numérique par la méthode « matched » de Vicanek (pôles par exp(sT), numérateur ajusté pour retrouver le gain analogique à 0 Hz, à la fréquence centrale et à Nyquist). Une atténuation est l'inverse exact de l'amplification de même réglage ; plateau aigu = gain linéaire × plateau grave inversé. Coupe-haut et passe-bande en « matched », coupe-bas et notch en RBJ. Repli automatique sur le RBJ si le calcul est instable ou impossible (jamais de NaN ni d'instabilité, vérifié par balayage).
+- Précision mesurée contre l'analogique, de 20 Hz à 20 kHz : cloche < 0,1 dB (Q ≥ 1, f0 ≤ 1 kHz), plateaux < 0,2 dB (f0 ≤ 1 kHz), cloche à 15 kHz < 1,5 dB à 44,1 kHz (RBJ : 7,5 dB). Les écarts croissent avec la fréquence centrale et quand Q est faible : limite d'un filtre numérique d'ordre 2.
+- L'interface (`ui/src/app.js`) calcule encore la courbe avec le RBJ simple : à aligner sur `FilterDesign` à l'étape 7, avec un test de concordance.
 - Pentes : cascade de Butterworth (6 dB/oct = 1er ordre, puis biquads), résonance sur le dernier étage seulement.
 - Paramètres lissés (~20 ms, `SmoothedValue`), coefficients recalculés tous les 32 échantillons.
 - Mid/Side : M = (L+R)/2, S = (L−R)/2 ; ne convertir que si une bande active l'utilise.

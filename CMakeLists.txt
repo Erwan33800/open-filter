@@ -20,14 +20,19 @@ FetchContent_MakeAvailable(Catch2)
 list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
 
 # --- DSP : C++ pur, sans JUCE ---
-add_library(OpenFilterDsp INTERFACE)
-target_include_directories(OpenFilterDsp INTERFACE Source)
-target_compile_features(OpenFilterDsp INTERFACE cxx_std_20)
+add_library(OpenFilterDsp STATIC
+    Source/dsp/FilterDesign.cpp)
+target_include_directories(OpenFilterDsp PUBLIC Source)
+target_compile_features(OpenFilterDsp PUBLIC cxx_std_20)
+if(NOT MSVC)
+    target_compile_options(OpenFilterDsp PRIVATE -Wall -Wextra -Wpedantic)
+endif()
 
 enable_testing()
 include(Catch)
 add_executable(OpenFilterTests
-    tests/dsp/test_skeleton.cpp)
+    tests/dsp/test_skeleton.cpp
+    tests/dsp/test_filter_design.cpp)
 target_link_libraries(OpenFilterTests PRIVATE OpenFilterDsp Catch2::Catch2WithMain)
 catch_discover_tests(OpenFilterTests)
 

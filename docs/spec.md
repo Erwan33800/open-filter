@@ -111,11 +111,11 @@ Le MVP n'a qu'un mode, Zéro latence. C'est celui qu'on utilise en live et qui s
 
 | Mode | Principe | Latence | Priorité |
 | --- | --- | --- | --- |
-| Zéro latence | Biquads avec correction de la déformation près de Nyquist (courbe fidèle à l'analogique jusqu'à 20 kHz) | 0 | MVP |
+| Zéro latence | Biquads avec correction de la déformation près de Nyquist (courbe plus proche de l'analogique que le bilinéaire classique) | 0 | MVP |
 | Phase naturelle | Magnitude et phase proches de l'analogique, sans pré-écho audible | Faible, reportée à l'hôte | v2 |
 | Phase linéaire | Filtres FIR par FFT, 3 résolutions (Basse, Moyenne, Haute) | Environ 70 à 210 ms à 44,1 kHz selon la résolution | v2 |
 
-**Point d'attention** : un biquad classique « écrase » les cloches près de 20 kHz (le manuel de Pro-Q 4 montre l'écart sur une cloche à 15 kHz). Le MVP doit corriger ça, par des formules adaptées (type Vicanek ou Orfanidis) ou par un suréchantillonnage 2x des bandes concernées.
+**Point d'attention** : un biquad classique « écrase » les cloches près de 20 kHz (le manuel de Pro-Q 4 montre l'écart sur une cloche à 15 kHz). Le MVP corrige ça par des formules adaptées (méthode de Vicanek, étape 2 faite) : sur une cloche à 15 kHz (+12 dB, Q = 1, 44,1 kHz), l'écart avec l'analogique tombe de 7,5 dB (RBJ) à environ 1 dB. Un filtre numérique d'ordre 2 ne peut pas suivre exactement l'analogique près de Nyquist : pour aller plus loin il faudrait le suréchantillonnage ou les modes Phase naturelle / linéaire (v2).
 
 Les modes de caractère (saturation Subtle et Warm de Pro-Q 4) sont à discuter pour la v2 : ils colleraient au son dub, mais ne font pas partie du cœur d'un EQ.
 
@@ -215,7 +215,7 @@ Ces objectifs se mesurent sur un projet de test fixe, à 44,1 kHz avec un buffer
 | CPU, 24 bandes dont 8 dynamiques | Moins de 3 % d'un cœur |
 | Thread audio | Aucune allocation mémoire, aucun verrou, aucun appel système |
 | Bruit et précision | Bande à 0 dB ou bypassée : sortie identique à l'entrée au bit près |
-| Fidélité de courbe | Écart de moins de 0,1 dB avec la courbe analogique théorique jusqu'à 20 kHz à 44,1 kHz |
+| Fidélité de courbe | Écart de moins de 0,1 dB avec la courbe analogique pour une cloche (Q ≥ 1, fréquence centrale ≤ 1 kHz) et de moins de 0,2 dB pour les plateaux (fréquence ≤ 1 kHz), de 20 Hz à 20 kHz. Moins de 1,5 dB pour une cloche à 15 kHz à 44,1 kHz. Tenu par les tests du DSP |
 | Automation | Aucun clic audible sur un balayage de fréquence de 20 Hz à 20 kHz en 1 s |
 | Stabilité | Aucun NaN ni débordement, même avec Q = 40, gain +30 dB et changement brutal de fréquence d'échantillonnage |
 | Sauvegarde | Un projet Live rouvert restaure exactement l'état, y compris les bandes dynamiques et la taille de fenêtre |
