@@ -108,6 +108,8 @@ Le projet vit dans WSL ; Visual Studio compile mal depuis un chemin `\wsl.localh
 - **Installer dans Live** : `powershell -ExecutionPolicy Bypass -File scripts\install.ps1` (terminal administrateur), en lui donnant le chemin du `.vst3` dézippé depuis la release.
 - **Interface seule** : `python ui/build_ui.py` puis ouvrir `ui/openfilter_ui.html` dans Chrome (données factices). `ui/openfilter_ui.html` est généré mais **versionné** (CMake l'embarque) : modifier `ui/src/*`, régénérer, commiter les deux.
 
+**Noms de tests Catch2 en ASCII** (anglais, sans accent ni apostrophe) : ctest les passe à Catch2 en ligne de commande et la console Windows les déforme, le test échoue alors avec « No test cases matched » (vu à l'étape 1). Les commentaires et les messages restent en français.
+
 Une étape n'est terminée que si : tests du DSP OK, compilation CI OK, pluginval OK, commit.
 
 ## Ordre de développement
