@@ -1,21 +1,12 @@
-/* ---------- pont avec le plugin ----------
-   Événement JUCE unique « openfilter », avec un tableau [commande, ...arguments].
-   Page -> plugin : ready ; begin <id> ; set <id> <valeur> ; end <id> ; ui <json>
-   Plugin -> page : snapshot {id: valeur} <json d'interface> ; params [[id, valeur], ...]
-   Les valeurs sont les vraies valeurs des paramètres (Hz, dB, index de choix, 0/1), pas des valeurs normalisées.
-   Hors plugin (navigateur), tout ceci est inactif. */
-const EVT = "openfilter";
+/* ---------- pont avec le plugin : partie propre à Open Filter ----------
+   Le mécanisme (gestes d'automation, snapshot, état d'interface) est dans open-core/ui/bridge-core.js, qui décrit le
+   protocole. Ici : le nom de l'événement et la traduction entre le modèle de l'interface (bandes, macros...) et les
+   paramètres du plugin (b{n}_freq, out_gain, macro1...). */
+const BRIDGE_EVENT = "openfilter"; // identique à Config::eventId dans Source/PluginEditor.cpp
 const TYPE_KEYS = ["bell", "lowshelf", "highshelf", "lowcut", "highcut", "notch", "bandpass"]; // index du paramètre « type »
 const TYPE_IDX = { bell: 0, lowshelf: 1, highshelf: 2, lowcut: 3, highcut: 4, notch: 5, bandpass: 6 };
 const PLACE_IDX = { st: 0, mid: 3, side: 4 };               // index du paramètre « place » (1 et 2 = gauche et droite, réservés)
 const PLACE_KEYS = { 0: "st", 1: "st", 2: "st", 3: "mid", 4: "side" };
-
-var bridgeReady = false;      // vrai quand le plugin a envoyé l'état : avant, on ne pousse rien (on écraserait l'état sauvegardé)
-const known = {};             // dernière valeur connue de chaque paramètre (envoyée ou reçue)
-const touched = new Set();    // paramètres modifiés pendant le geste en cours
-var gestureActive = false;
-
-function toPlugin(...a) { if (JUCE_MODE) try { window.__JUCE__.backend.emitEvent(EVT, a); } catch (_) {} }
 
 /* Modèle de l'interface -> valeurs de paramètres. Les réglages « Auto » ne poussent pas leur valeur manuelle. */
 function bandToParams(b, out) {
@@ -52,32 +43,6 @@ function modelToParams() {
   out.phase_invert = S.phase ? 1 : 0;
   S.macros.forEach((m, i) => { out["macro" + (i + 1)] = m.v; });
   return out;
-}
-
-/* Envoie au plugin ce qui a changé depuis la dernière synchronisation. Pendant un geste (bouton de souris enfoncé),
-   chaque paramètre ouvre un geste d'automation qui se referme au relâchement ; sinon (molette, menu), begin/set/end d'un coup. */
-function bridgePush() {
-  if (!JUCE_MODE || !bridgeReady) return;
-  const values = modelToParams();
-
-  for (const id in values) {
-    const v = values[id];
-    if (known[id] === v) continue;
-
-    if (gestureActive) {
-      if (!touched.has(id)) { touched.add(id); toPlugin("begin", id); }
-      toPlugin("set", id, v);
-    } else {
-      toPlugin("begin", id); toPlugin("set", id, v); toPlugin("end", id);
-    }
-    known[id] = v;
-  }
-}
-
-function endGesture() {
-  gestureActive = false;
-  touched.forEach(id => toPlugin("end", id));
-  touched.clear();
 }
 
 /* Valeurs de paramètres -> modèle de l'interface (état restauré, automation de l'hôte). */
@@ -169,40 +134,4 @@ function applyUiState(json) {
       }
     });
   syncBottomControls();
-}
-
-var lastUiJson = "";
-function persistUi() {
-  if (!JUCE_MODE || !bridgeReady) return;
-  const json = uiStateJson();
-  if (json !== lastUiJson) { lastUiJson = json; toPlugin("ui", json); }
-}
-
-function bridgeStart() {
-  if (!JUCE_MODE) return;
-
-  window.__JUCE__.backend.addEventListener(EVT, a => {
-    try {
-      const arr = Array.isArray(a) ? a : [];
-      if (arr[0] === "snapshot") {
-        applyUiState(arr[2]);
-        applyParams(arr[1] || {});
-        lastUiJson = uiStateJson();
-        bridgeReady = true;
-      } else if (arr[0] === "params" && bridgeReady) {
-        const values = {};
-        (arr[1] || []).forEach(p => { values[p[0]] = p[1]; });
-        applyParams(values);
-      }
-    } catch (e) { console.error(e); }
-  });
-
-  // Un geste dure du bouton enfoncé au bouton relâché.
-  document.addEventListener("pointerdown", () => { gestureActive = true; }, true);
-  window.addEventListener("pointerup", endGesture, true);
-  window.addEventListener("pointercancel", endGesture, true);
-  window.addEventListener("blur", endGesture);
-
-  setInterval(persistUi, 700);
-  toPlugin("ready");
 }

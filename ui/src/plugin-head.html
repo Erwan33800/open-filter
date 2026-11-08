@@ -4,44 +4,17 @@
 <meta charset="utf-8">
 <title>Open Filter</title>
 <style>
-/* Interface Open Filter. Tokens repris d'Open Groove (plugin-head.html).
-   Police Manrope (SIL OFL) intégrée en base64 par build_ui.py à la place du marqueur __MANROPE__ : le WebView est hors ligne. */
-@font-face{font-family:"Manrope";font-style:normal;font-weight:200 800;font-display:swap;src:url(data:font/woff2;base64,__MANROPE__) format("woff2")}
+/* Interface Open Filter. Le socle (tokens, police Manrope, composants communs) vient d'open-core/ui/open-base.css,
+   inséré par assemble_ui.py à la place du marqueur ci-dessous. Ici : ce qui est propre à Open Filter. */
+/*__OPEN_CORE_CSS__*/
 :root{
-  --bg:#151516; --panel:#1d1d1f; --tile:#2a2a2d; --tile-hi:#343438; --line:#2c2c30;
-  --fg:#f1f0ee; --dim:#a4a4aa; --faint:#6f6f77;
-  --accent:#5fd4b8; --drop:#ff6b57;
   --pl-st:#f5d54d; --pl-mid:#6fd98a; --pl-side:#6aa8ff; --pl-l:#f1f0ee; --pl-r:#ff6b57;
-  --sans:"Manrope","Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,sans-serif;
-  --mono:"Cascadia Mono",Consolas,ui-monospace,Menlo,monospace;
-  color-scheme:dark;
 }
-*{box-sizing:border-box}
-html,body{margin:0;height:100%;min-width:980px;min-height:620px;overflow:hidden;background:var(--bg);color:var(--fg);font:500 13px/1.35 var(--sans);-webkit-font-smoothing:antialiased;user-select:none}
-button{font:inherit;color:inherit;margin:0;cursor:pointer}
-[hidden]{display:none!important}
-:focus-visible{outline:1px solid var(--fg);outline-offset:1px}
-.win{height:100%;display:grid;grid-template-rows:54px minmax(0,1fr) 74px}
-.lab{font-size:11px;font-weight:600;color:var(--faint);white-space:nowrap}
 
 /* en-tête */
-.top{display:flex;align-items:center;gap:12px;padding:0 14px;min-width:0}
-.logo{display:flex;align-items:center;gap:9px;font-weight:800;letter-spacing:.07em;font-size:14px;width:172px;flex:none}
-.mark{width:26px;height:26px;border-radius:6px;border:1.8px solid var(--accent);display:grid;place-items:center}
-.mark svg{width:16px;height:16px;stroke:var(--accent);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .bar{flex:1;min-width:0;height:32px;border-radius:8px;background:var(--panel);display:flex;align-items:center;gap:10px;padding:0 12px;font-size:12px;color:var(--dim)}
 .bar b{color:var(--fg);font-weight:600}
 .bar .sd{margin-left:auto;font:11px var(--mono);color:var(--faint)}
-.tabs{display:flex;gap:2px;padding:3px;border-radius:9px;background:var(--panel)}
-.tab{border:0;background:none;color:var(--faint);height:28px;padding:0 13px;border-radius:7px;font-weight:700;font-size:11px;letter-spacing:.09em;text-transform:uppercase;white-space:nowrap}
-.tab:hover{color:var(--fg)}
-.tab[aria-selected="true"]{background:var(--tile-hi);color:var(--fg)}
-.ib{width:32px;height:32px;border:0;background:var(--panel);border-radius:8px;display:grid;place-items:center;color:var(--dim);padding:0}
-.ib:hover:not(:disabled){color:var(--fg);background:var(--tile)}
-.ib:disabled{opacity:.3;cursor:default}
-.ib svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.ib[aria-pressed="true"]{color:var(--accent)}
-.sq{display:flex;align-items:center;gap:6px}
 
 /* écran de courbe */
 .mid{display:grid;grid-template-rows:minmax(0,1fr) auto;padding:0 14px 10px;min-height:0}
@@ -69,26 +42,6 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 .bp .tg{background:var(--tile)}
 .bp .tg:hover{background:var(--tile-hi)}
 .bp .tg[aria-pressed="true"]{background:var(--accent);color:#101012}
-.vb{position:relative;height:28px;min-width:70px;white-space:nowrap;padding:0 11px;border-radius:7px;background:var(--tile);display:flex;align-items:center;justify-content:center;font:500 12px var(--mono);cursor:ns-resize;overflow:hidden;touch-action:none;color:var(--fg);border:0}
-.vb:hover,.vb.drag{background:var(--bg)}
-.vb.sel{cursor:pointer;justify-content:space-between;gap:10px;min-width:118px;font:600 12px var(--sans)}
-.vb.sel svg{width:10px;height:10px;stroke:var(--dim);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.vb:disabled{opacity:.35;cursor:default}
-.segc{display:flex;gap:2px;padding:2px;border-radius:7px;background:var(--bg)}
-.segc button{border:0;background:none;height:24px;padding:0 10px;border-radius:5px;color:var(--faint);font-weight:600;font-size:12px}
-.segc button:hover{color:var(--fg)}
-.segc button[aria-checked="true"]{background:var(--c,var(--accent));color:#101012}
-.tg{border:0;height:28px;padding:0 11px;border-radius:7px;background:var(--tile);color:var(--dim);font-weight:600;font-size:12px}
-.tg:hover{background:var(--bg);color:var(--fg)}
-.tg[aria-pressed="true"]{background:var(--accent);color:#101012}
-.tg.del:hover{color:var(--drop)}
-.menu{position:absolute;min-width:210px;padding:4px;border-radius:9px;background:var(--tile-hi);box-shadow:0 10px 28px rgba(0,0,0,.55);z-index:30;display:grid;gap:1px}
-.mi{border:0;background:none;height:28px;border-radius:6px;padding:0 10px;display:flex;justify-content:space-between;align-items:center;gap:14px;font-size:12.5px;font-weight:600;text-align:left}
-.mi small{font:10.5px var(--mono);color:var(--faint);font-weight:400}
-.mi:hover{background:var(--tile)}
-.mi[aria-checked="true"]{color:var(--accent)}
-.mi.danger:hover{color:var(--drop)}
-.msep{height:1px;background:var(--line);margin:3px 4px}
 
 /* sélecteur de presets */
 button.bar{border:0;text-align:left;cursor:pointer}
@@ -134,7 +87,6 @@ button.bar:hover{background:var(--tile)}
 .gl{font-size:11.5px;font-weight:600;color:var(--dim);white-space:nowrap;display:flex;align-items:center;gap:8px}
 .gl b{font:500 11.5px var(--mono);color:var(--fg)}
 .row{display:flex;align-items:center;gap:6px}
-.grow{flex:1}
 .bot .segc button{height:30px;padding:0 13px;font-size:12.5px;color:var(--dim)}
 .bot .segc button:hover{color:var(--fg)}
 .bot .segc button[aria-checked="true"]{color:#101012}

@@ -16,7 +16,8 @@ Open Filter est un égaliseur paramétrique et dynamique (VST3, Windows d'abord,
 
 - Cahier des charges : `docs/spec.md` (plages, défauts, priorités MVP / v1 / v2). On ne développe que ce qui est marqué **MVP**, sauf demande explicite. Les idées hors MVP vont dans `docs/backlog.md`.
 - `maquette/` (racine, hors dépôt) : brouillon du POC (ancien nom « Prisme EQ », ancien CLAUDE.md, prototype Web Audio). **Non versionné**, consultable pour le comportement de la courbe (`maquette/docs/prototype.html`), à supprimer quand le projet sera terminé. Ne rien y modifier.
-- Projet frère : `../open-groove` (même pile WebView2, mêmes tokens visuels).
+- Noyau commun : `../open-core` (module CMake, éditeur WebView2 et pont de paramètres, CSS et pont JS, CI). Version épinglée dans `OPEN_CORE_VERSION`. Voir son `README.md` et son `CLAUDE.md`.
+- Projet frère : `../open-groove` (même pile WebView2, mêmes tokens visuels ; n'utilise pas encore le noyau).
 
 ## Langue
 
@@ -26,17 +27,18 @@ Open Filter est un égaliseur paramétrique et dynamique (VST3, Windows d'abord,
 ## Pile technique
 
 - C++20, JUCE 8.0.4 (FetchContent, tag épinglé, jamais une branche), Catch2 v3 pour les tests du DSP.
-- **Interface en HTML/CSS/JS dans un WebView2**, comme Open Groove : `ui/src/*` assemblé par `ui/build_ui.py` en `ui/openfilter_ui.html`, embarqué via `juce_add_binary_data`. Ne jamais éditer le HTML généré à la main.
+- **Interface en HTML/CSS/JS dans un WebView2**, comme Open Groove : `ui/src/*` assemblé par `ui/build_ui.py` (avec le socle d'`open-core`) en `ui/openfilter_ui.html`, embarqué via `juce_add_binary_data`. Ne jamais éditer le HTML généré à la main.
+- **Open Core** (`../open-core`) fournit `open_add_plugin()` (CMake), `open::ParamBridgeEditor` (éditeur et pont côté C++), `open-base.css` (tokens et composants communs), `bridge-core.js` (pont côté page) et la CI. `build_ui.py` et CMake le trouvent par `OPEN_CORE_DIR`, sinon le dossier voisin `../open-core` ; la CI télécharge la version de `OPEN_CORE_VERSION`. **Changer le CSS commun ou le pont = modifier open-core**, pas ce dépôt.
 - La page doit aussi fonctionner seule dans Chrome (données factices) pour itérer sans compiler.
 - Repli si la fluidité est insuffisante dans Live : rendu natif JUCE (`juce::Path`).
 
-## Identité visuelle (partagée avec Open Groove)
+## Identité visuelle (partagée, définie dans `../open-core/ui/open-base.css`)
 
-Reprendre les variables de `../open-groove/ui/src/plugin-head.html` sans les réinventer :
+Le socle (tokens, police, en-tête, onglets, `.ib`, `.vb`, `.segc`, `.tg`, `.menu`) vient d'open-core ; `ui/src/plugin-head.html` n'en garde que ce qui est propre à Open Filter (barre de preset, panneau de bande, macros, barre du bas, couleurs de placement). Rappel des valeurs :
 
 - Fond `--bg #151516`, panneaux `--panel #1d1d1f`, tuiles `--tile #2a2a2d` / `--tile-hi #343438`, traits `--line #2c2c30`.
 - Texte `--fg #f1f0ee`, `--dim #a4a4aa`, `--faint #6f6f77`.
-- Police Manrope (SIL OFL, base64 via `__MANROPE__`), Cascadia Mono pour les chiffres.
+- Police Manrope (SIL OFL, intégrée en base64 par open-core), Cascadia Mono pour les chiffres.
 - Look plat, tuiles arrondies (8 px), pas de dégradés, **un seul accent** à la fois. L'accent d'Open Filter reste à choisir parmi la palette d'Open Groove (teal `#5fd4b8` par défaut).
 - Composants à réutiliser tels quels : en-tête avec logo-marque et onglets en capitales espacées, valeurs à glisser (`.vb`), segments (`.segc`), menus (`.menu`), barre du bas.
 - Couleurs de placement stéréo (spec) : stéréo jaune, gauche blanc, droite rouge, mid vert, side bleu. À accorder avec la palette plate.
@@ -51,10 +53,11 @@ Source/
   params/         layout APVTS (24 bandes + globaux), IDs stables
   analyser/       FIFO sans verrou, FFT, lissage
   PluginProcessor.*   effet stéréo + bus sidechain, état
-  PluginEditor.*      WebBrowserComponent (WebView2), pont JS <-> C++
+  PluginEditor.*      fine couche sur open::ParamBridgeEditor (open-core) : nom de l'événement, page, état d'interface
+OPEN_CORE_VERSION   version d'open-core épinglée (CMake, build_ui.py, CI)
 ui/
-  src/              plugin-head.html (HTML + CSS), app.js, manrope-latin.woff2
-  build_ui.py       assemble openfilter_ui.html (police en base64 via __MANROPE__)
+  src/              plugin-head.html (HTML + CSS propre au plugin), app.js, bridge.js (modèle <-> paramètres), init.js
+  build_ui.py       assemble openfilter_ui.html (CSS commun, police et pont générique viennent d'open-core)
   openfilter_ui.html  page générée, embarquée dans le binaire
 tests/dsp/          Catch2
 scripts/install.ps1
@@ -63,7 +66,7 @@ docs/               spec.md, backlog.md
 
 ### Pont interface <-> plugin (fait)
 
-Événement JUCE unique `openfilter`, tableau `[commande, ...arguments]`. Code : `ui/src/bridge.js` (page) et `Source/PluginEditor.cpp` (plugin).
+Événement JUCE unique `openfilter`, tableau `[commande, ...arguments]`. Code : `../open-core/ui/bridge-core.js` (mécanisme, côté page), `ui/src/bridge.js` (traduction modèle de l'interface <-> paramètres, propre à Open Filter), `../open-core/Source/open/ParamBridgeEditor.*` (côté plugin) et `Source/PluginEditor.cpp` (configuration).
 
 - **Page -> plugin** : `ready` (page chargée) ; `begin <id>` ; `set <id> <valeur>` ; `end <id>` ; `ui <json>` (réglages d'interface à sauvegarder).
 - **Plugin -> page** : `snapshot {id: valeur} <json>` (état complet, en réponse à `ready`) ; `params [[id, valeur], ...]` (changements venus de l'hôte).
@@ -115,12 +118,12 @@ Le projet vit dans WSL ; Visual Studio compile mal depuis un chemin `\wsl.localh
   cmake --build build-tests
   ctest --test-dir build-tests --output-on-failure
   ```
-  Prérequis WSL : `sudo apt install cmake g++ ninja-build` (absents au 8 nov. 2026). Tout ce qui est dans `Source/dsp/` doit rester compilable ainsi : pas d'include JUCE.
-- **Plugin complet** : poussé sur GitHub, la CI (`.github/workflows/build.yml`) lance les tests du DSP, compile Windows (VST3 + Standalone) et macOS (VST3 + AU), exécute pluginval niveau 10 (`--skip-gui-tests`, sans interface sur le runner), puis publie la release « latest » sur `main`.
+  Prérequis WSL : `cmake g++ ninja-build python3` (présents au 8 nov. 2026). Tout ce qui est dans `Source/dsp/` doit rester compilable ainsi : pas d'include JUCE. Open Core est repris du dossier voisin `../open-core` (ou `OPEN_CORE_DIR`).
+- **Plugin complet** : poussé sur GitHub, la CI (`.github/workflows/build.yml`, qui appelle le workflow commun d'open-core) lance les tests du DSP, vérifie la page générée et le pont, compile Windows (VST3 + Standalone) et macOS (VST3 + AU), exécute pluginval niveau 10 (`--skip-gui-tests`, sans interface sur le runner), puis publie la release « latest » sur `main`. **Prérequis : le dépôt `Erwan33800/open-core` existe sur GitHub avec le tag de `OPEN_CORE_VERSION`** (sinon la CI échoue au téléchargement).
 - **Compilation locale Windows** (optionnelle, il faudrait cloner le dépôt sous `C:\` et installer CMake ≥ 3.25 + Visual Studio 2022 « Développement Desktop en C++ » + SDK WebView2, voir le workflow) :
   `cmake -B build -G "Visual Studio 17 2022" -A x64`, puis `cmake --build build --config Release`.
 - **Installer dans Live** : `powershell -ExecutionPolicy Bypass -File scripts\install.ps1` (terminal administrateur), en lui donnant le chemin du `.vst3` dézippé depuis la release.
-- **Interface seule** : `python ui/build_ui.py` puis ouvrir `ui/openfilter_ui.html` dans Chrome (données factices). `ui/openfilter_ui.html` est généré mais **versionné** (CMake l'embarque) : modifier `ui/src/*`, régénérer, commiter les deux.
+- **Interface seule** (open-core à côté, ou `OPEN_CORE_DIR`) : `python ui/build_ui.py` puis ouvrir `ui/openfilter_ui.html` dans Chrome (données factices). `ui/openfilter_ui.html` est généré mais **versionné** (CMake l'embarque) : modifier `ui/src/*`, régénérer, commiter les deux.
 
 **Noms de tests Catch2 en ASCII** (anglais, sans accent ni apostrophe) : ctest les passe à Catch2 en ligne de commande et la console Windows les déforme, le test échoue alors avec « No test cases matched » (vu à l'étape 1). Les commentaires et les messages restent en français.
 

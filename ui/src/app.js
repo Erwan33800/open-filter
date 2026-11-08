@@ -1,6 +1,4 @@
-"use strict";
-/* Mode plugin : la page est dans le WebView du plugin (window.__JUCE__). Sinon : navigateur, données factices. */
-const JUCE_MODE = !!(window.__JUCE__ && window.__JUCE__.backend);
+/* "use strict" et JUCE_MODE viennent d'open-core/ui/bridge-core.js, placé avant ce fichier. */
 /* ---------- constantes ---------- */
 const FS = 48000, FMIN = 10, FMAX = 30000;
 const TYPES = {

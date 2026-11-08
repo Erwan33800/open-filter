@@ -9,3 +9,6 @@ out/
 CMakeUserPresets.json
 # brouillon du POC à la racine (non versionné, à supprimer en fin de projet)
 /maquette/
+
+# copie d'open-core récupérée par la CI
+/.open-core/

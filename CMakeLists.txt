@@ -8,16 +8,28 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # OFF : ne compile que le DSP et ses tests (rapide, sans JUCE, utilisable dans WSL / Linux).
 option(OPENFILTER_PLUGIN "Compiler le plugin (JUCE, WebView2)" ON)
 
+# --- Open Core : code commun aux plugins Open (https://github.com/Erwan33800/open-core) ---
+# Version épinglée dans OPEN_CORE_VERSION. Pour travailler sur le noyau en même temps : variable d'environnement
+# OPEN_CORE_DIR, ou dossier open-core voisin de celui du plugin (utilisé tel quel, sans tenir compte de la version).
 include(FetchContent)
+if(DEFINED ENV{OPEN_CORE_DIR})
+    file(TO_CMAKE_PATH "$ENV{OPEN_CORE_DIR}" OPEN_CORE_SOURCE_DIR)
+elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../open-core/cmake/OpenPlugin.cmake")
+    get_filename_component(OPEN_CORE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../open-core" ABSOLUTE)
+else()
+    file(STRINGS OPEN_CORE_VERSION OPEN_CORE_TAG LIMIT_COUNT 1)
+    FetchContent_Declare(
+        open-core
+        GIT_REPOSITORY https://github.com/Erwan33800/open-core.git
+        GIT_TAG        ${OPEN_CORE_TAG}
+        GIT_SHALLOW    TRUE)
+    FetchContent_MakeAvailable(open-core)
+    set(OPEN_CORE_SOURCE_DIR ${open-core_SOURCE_DIR})
+endif()
+include(${OPEN_CORE_SOURCE_DIR}/cmake/OpenPlugin.cmake)
 
-# --- Tests : Catch2 v3, tag épinglé ---
-FetchContent_Declare(
-    Catch2
-    GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-    GIT_TAG        v3.7.1
-    GIT_SHALLOW    TRUE)
-FetchContent_MakeAvailable(Catch2)
-list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
+# --- Tests : Catch2 v3 ---
+open_use_catch2()
 
 # --- DSP : C++ pur, sans JUCE ---
 add_library(OpenFilterDsp STATIC
@@ -30,8 +42,6 @@ if(NOT MSVC)
     target_compile_options(OpenFilterDsp PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
-enable_testing()
-include(Catch)
 add_executable(OpenFilterTests
     tests/dsp/test_skeleton.cpp
     tests/dsp/test_filter_design.cpp
@@ -48,57 +58,18 @@ if(NOT OPENFILTER_PLUGIN)
     return()
 endif()
 
-# --- Plugin : JUCE 8.0.4, tag épinglé ---
-FetchContent_Declare(
-    juce
-    GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
-    GIT_TAG        8.0.4
-    GIT_SHALLOW    TRUE)
-FetchContent_MakeAvailable(juce)
-
-set(OPENFILTER_FORMATS VST3 Standalone)
-if(APPLE)
-    list(APPEND OPENFILTER_FORMATS AU)
-endif()
-
+# --- Plugin : JUCE, éditeur WebView2 et pont des paramètres viennent d'open-core ---
 # Effet audio (pas un instrument) : entrée et sortie mono ou stéréo, plus un bus sidechain stéréo optionnel.
-juce_add_plugin(OpenFilter
-    COMPANY_NAME                 "Erwan"
-    PRODUCT_NAME                 "Open Filter"
-    BUNDLE_ID                    "fr.erwan.openfilter"
-    PLUGIN_MANUFACTURER_CODE     Ewan
-    PLUGIN_CODE                  OpnF
-    FORMATS                      ${OPENFILTER_FORMATS}
-    IS_SYNTH                     FALSE
-    NEEDS_MIDI_INPUT             FALSE
-    NEEDS_MIDI_OUTPUT            FALSE
-    IS_MIDI_EFFECT               FALSE
-    EDITOR_WANTS_KEYBOARD_FOCUS  TRUE
-    NEEDS_WEBVIEW2               TRUE
-    COPY_PLUGIN_AFTER_BUILD      FALSE
-    VST3_CATEGORIES              Fx EQ)
-
-juce_add_binary_data(OpenFilterUI SOURCES ui/openfilter_ui.html)
-
-target_sources(OpenFilter PRIVATE
-    Source/params/ParameterLayout.cpp
-    Source/PluginProcessor.cpp
-    Source/PluginEditor.cpp)
-
-target_compile_definitions(OpenFilter PUBLIC
-    JUCE_WEB_BROWSER=1
-    JUCE_USE_CURL=0
-    JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1
-    JUCE_VST3_CAN_REPLACE_VST2=0
-    JUCE_DISPLAY_SPLASH_SCREEN=0)
-
-target_link_libraries(OpenFilter
-    PRIVATE
-        OpenFilterUI
-        OpenFilterDsp
-        juce::juce_audio_utils
-        juce::juce_gui_extra
-    PUBLIC
-        juce::juce_recommended_config_flags
-        juce::juce_recommended_lto_flags
-        juce::juce_recommended_warning_flags)
+open_add_plugin(
+    TARGET        OpenFilter
+    PRODUCT_NAME  "Open Filter"
+    SLUG          openfilter
+    PLUGIN_CODE   OpnF
+    KIND          EFFECT
+    CATEGORIES    "Fx EQ"
+    SOURCES
+        Source/params/ParameterLayout.cpp
+        Source/PluginProcessor.cpp
+        Source/PluginEditor.cpp
+    LINK
+        OpenFilterDsp)

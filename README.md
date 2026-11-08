@@ -21,6 +21,7 @@ Le dépôt ne contient que le code source. Le plugin prêt à installer est fabr
 
 ## 3. Développer
 
+- Code commun : Open Filter s'appuie sur Open Core (dépôt `open-core` : CMake, éditeur WebView2, CSS et pont communs, CI), à la version indiquée dans `OPEN_CORE_VERSION`. En local, place le dossier `open-core` à côté de celui-ci (ou définis `OPEN_CORE_DIR`).
 - Interface : modifier `ui/src/*`, puis `python ui/build_ui.py`, et commiter aussi `ui/openfilter_ui.html`. Ouvrir ce fichier dans Chrome suffit pour tester l'interface (données factices).
 - Tests du DSP seuls (WSL ou Linux, sans JUCE) :
   ```
