@@ -1,4 +1,6 @@
 "use strict";
+/* Mode plugin : la page est dans le WebView du plugin (window.__JUCE__). Sinon : navigateur, données factices. */
+const JUCE_MODE = !!(window.__JUCE__ && window.__JUCE__.backend);
 /* ---------- constantes ---------- */
 const FS = 48000, FMIN = 10, FMAX = 30000;
 const TYPES = {
@@ -183,7 +185,7 @@ function draw(){
     if(b.on){ ctx.fillStyle=col; ctx.fill(); } else { ctx.fillStyle=css("--panel"); ctx.fill(); ctx.strokeStyle=col; ctx.lineWidth=1.5; ctx.stroke(); }
     if(sel){ ctx.beginPath(); ctx.arc(x,y,r+4,0,7); ctx.strokeStyle=fg; ctx.lineWidth=1; ctx.stroke(); }
     ctx.fillStyle=b.on?"#101012":col; ctx.font='700 9.5px '+css("--sans"); ctx.textAlign="center"; ctx.textBaseline="middle";
-    ctx.fillText(String(S.bands.indexOf(b)+1), x, y+.5);
+    ctx.fillText(String(b.id), x, y+.5);
   }
 
   // info de survol/glisser
@@ -216,12 +218,14 @@ function hit(x,y){
 function rectPos(e){ const r=cv.getBoundingClientRect(); return {x:e.clientX-r.left,y:e.clientY-r.top}; }
 
 function defaultType(f){ return f<30?"lowcut": f<90?"lowshelf": f>16000?"highcut": f>8000?"highshelf":"bell"; }
+// Une bande garde sa case (1 à 24) à vie : c'est elle qui désigne ses paramètres dans Live (« B3 Freq »).
+function freeSlot(){ for(let n=1;n<=24;n++) if(!S.bands.some(b=>b.id===n)) return n; return 0; }
 function addBand(f,g){
-  if(S.bands.length>=24) return;
+  const slot=freeSlot(); if(!slot) return;
   pushUndo();
   const type=defaultType(f), t=TYPES[type];
-  const b={id:S.nextId++,type,freq:clamp(f,FMIN,FMAX),gain:t.gain?clamp(g,-30,30):0,q:type==="bell"?1:0.71,slope:12,place:"st",on:true,dyn:false,range:-6};
-  S.bands.push(b); S.sel=b.id; refresh();
+  const b={id:slot,type,freq:clamp(f,FMIN,FMAX),gain:t.gain?clamp(g,-30,30):0,q:type==="bell"?1:0.71,slope:12,place:"st",on:true,dyn:false,range:-6};
+  S.bands.push(b); S.bands.sort((x,y)=>x.id-y.id); S.sel=b.id; refresh();
 }
 function removeBand(id){ pushUndo(); S.bands=S.bands.filter(b=>b.id!==id); S.macros.forEach(m=>m.asg=m.asg.filter(a=>a.id!==id)); if(S.sel===id) S.sel=-1; refresh(); }
 
@@ -281,7 +285,7 @@ function showBandMenu(b,x,y){
   items.push("-");
   if(TYPES[b.type].dyn) items.push({label:b.dyn?"Rendre statique":"Rendre dynamique",hint:"Alt+molette",run:()=>{pushUndo();b.dyn=!b.dyn;refresh();}});
   items.push({label:b.on?"Désactiver":"Activer",hint:"Alt+clic",run:()=>{pushUndo();b.on=!b.on;refresh();}});
-  items.push({label:"Dupliquer",run:()=>{ if(S.bands.length<24){pushUndo();const c=Object.assign({},b,{id:S.nextId++,freq:clamp(b.freq*1.2,FMIN,FMAX)});S.bands.push(c);S.sel=c.id;refresh();}}});
+  items.push({label:"Dupliquer",run:()=>{ const slot=freeSlot(); if(slot){pushUndo();const c=Object.assign({},b,{id:slot,freq:clamp(b.freq*1.2,FMIN,FMAX)});S.bands.push(c);S.bands.sort((x,y)=>x.id-y.id);S.sel=c.id;refresh();}}});
   items.push({label:"Supprimer",hint:"Suppr",danger:true,run:()=>removeBand(b.id)});
   showMenu(items,x+10,y+10);
 }
@@ -314,7 +318,7 @@ function buildPanel(){
   bp.className="bp"; bp.style.setProperty("--bc",`var(${PLACES[b.place].c})`);
   if(b.ratio===undefined) Object.assign(b,{thresh:null,ratio:4,attack:null,release:null,src:"in",listen:false});
   const t=TYPES[b.type], row=document.createElement("div"); row.className="brow";
-  const title=document.createElement("div"); title.className="btitle"; title.innerHTML=`<b>Bande ${S.bands.indexOf(b)+1}</b><span>${PLACES[b.place].n}</span>`; row.appendChild(title);
+  const title=document.createElement("div"); title.className="btitle"; title.innerHTML=`<b>Bande ${b.id}</b><span>${PLACES[b.place].n}</span>`; row.appendChild(title);
   const typ=document.createElement("button"); typ.className="vb sel"; typ.innerHTML=`<span>${t.n}</span><svg viewBox="0 0 12 12"><path d="M2 4l4 4 4-4"/></svg>`;
   typ.onclick=e=>{ const r=typ.getBoundingClientRect(), st=$("stage").getBoundingClientRect(); showBandMenu(b,r.left-st.left,r.top-st.top); e.stopPropagation(); };
   row.appendChild(fld("Type",typ));
@@ -362,11 +366,14 @@ function seg(id,opts,get,set){
   for(const [k,l] of opts){ const b=document.createElement("button"); b.textContent=l; b.setAttribute("aria-checked",get()===k); b.onclick=()=>{set(k); for(const x of el.children) x.setAttribute("aria-checked",x===b);}; el.appendChild(b); }
 }
 function setRange(r){ S.range=r; seg("scale",[[3,"±3"],[6,"±6"],[12,"±12"],[30,"±30"]],()=>S.range,setRange); }
-seg("scale",[[3,"±3"],[6,"±6"],[12,"±12"],[30,"±30"]],()=>S.range,setRange);
-seg("spec",[["off","Off"],["pre","Pré"],["post","Post"],["prepost","Pré+Post"]],()=>S.spec,v=>S.spec=v);
-seg("fall",[["lente","Lente"],["moy","Moyenne"],["rapide","Rapide"]],()=>S.fall,v=>S.fall=v);
-seg("drng",[[60,"60 dB"],[90,"90 dB"],[120,"120 dB"]],()=>S.dbRange,v=>S.dbRange=v);
-valueBox($("tilt"),{get:()=>S.tilt,set:v=>S.tilt=v,fmt:()=>S.tilt.toFixed(1)+" dB/oct",drag:(v,dy)=>clamp(v+dy/20,0,6),def:4.5});
+function syncBottomControls(){
+  seg("scale",[[3,"±3"],[6,"±6"],[12,"±12"],[30,"±30"]],()=>S.range,setRange);
+  seg("spec",[["off","Off"],["pre","Pré"],["post","Post"],["prepost","Pré+Post"]],()=>S.spec,v=>S.spec=v);
+  seg("fall",[["lente","Lente"],["moy","Moyenne"],["rapide","Rapide"]],()=>S.fall,v=>S.fall=v);
+  seg("drng",[[60,"60 dB"],[90,"90 dB"],[120,"120 dB"]],()=>S.dbRange,v=>S.dbRange=v);
+  valueBox($("tilt"),{get:()=>S.tilt,set:v=>S.tilt=v,fmt:()=>S.tilt.toFixed(1)+" dB/oct",drag:(v,dy)=>clamp(v+dy/20,0,6),def:4.5});
+}
+syncBottomControls();
 // échelle du vumètre
 (function(){ const t=$("mticks"); for(const d of [-60,-40,-20,-6,0]){ const s=document.createElement("span"); s.textContent=d; s.style.left=((d+60)/60*100)+"%"; t.appendChild(s); } })();
 // popovers ancrés au-dessus de leur bouton
@@ -386,9 +393,14 @@ document.addEventListener("pointerdown",e=>{
   for(const x of document.querySelectorAll(".pop")) x.hidden=true;
   for(const b of [$("anBtn"),$("helpBtn")]) b.setAttribute("aria-expanded","false");
 },true);
-valueBox($("outg"),{get:()=>S.outGain,set:v=>S.outGain=v,fmt:()=>fmtG(S.outGain),drag:(v,dy)=>clamp(v+dy/8,-36,36),def:0});
-$("phase").onclick=function(){ S.phase=!S.phase; this.setAttribute("aria-pressed",S.phase); };
-$("bypass").onclick=function(){ S.bypass=!S.bypass; this.setAttribute("aria-pressed",S.bypass); };
+function syncGlobalsUI(){
+  valueBox($("outg"),{get:()=>S.outGain,set:v=>S.outGain=v,fmt:()=>fmtG(S.outGain),drag:(v,dy)=>clamp(v+dy/8,-36,36),def:0});
+  $("phase").setAttribute("aria-pressed",S.phase);
+  $("bypass").setAttribute("aria-pressed",S.bypass);
+}
+syncGlobalsUI();
+$("phase").onclick=function(){ S.phase=!S.phase; this.setAttribute("aria-pressed",S.phase); refresh(true); };
+$("bypass").onclick=function(){ S.bypass=!S.bypass; this.setAttribute("aria-pressed",S.bypass); refresh(true); };
 $("undo").onclick=doUndo; $("redo").onclick=doRedo;
 document.addEventListener("keydown",e=>{
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"){ e.preventDefault(); e.shiftKey?doRedo():doUndo(); }
@@ -504,7 +516,7 @@ const PRESETS = {
 };
 function applyPreset(cat,i){
   const p=PRESETS[cat][i]; pushUndo();
-  S.bands=p.bands.map(b=>Object.assign({},b,{id:S.nextId++}));
+  S.bands=p.bands.map((b,i)=>Object.assign({},b,{id:i+1})); // cases 1 à n, les suivantes sont libérées
   const ids=S.bands.map(b=>b.id);
   S.macros=emptyMacros();
   (p.macros||[]).forEach((m,k)=>{ S.macros[k]={name:m.n,v:0,asg:m.a.map(([bi,pp,a,b])=>({id:ids[bi],p:pp,a,b}))}; });
@@ -553,7 +565,7 @@ function addAsg(mi,p){
 }
 function renderMacros(){
   const g=$("macgrid"), sb=selBand(); g.innerHTML="";
-  $("macsel").innerHTML = sb ? `Bande sélectionnée : <b>B${S.bands.indexOf(sb)+1} · ${TYPES[sb.type].n} · ${fmtF(sb.freq)}</b>. Choisis une macro et ajoute un de ses réglages.` : `Aucune bande sélectionnée. Sélectionne une bande dans l'onglet <b>Courbe</b>, puis reviens l'assigner à une macro.`;
+  $("macsel").innerHTML = sb ? `Bande sélectionnée : <b>B${sb.id} · ${TYPES[sb.type].n} · ${fmtF(sb.freq)}</b>. Choisis une macro et ajoute un de ses réglages.` : `Aucune bande sélectionnée. Sélectionne une bande dans l'onglet <b>Courbe</b>, puis reviens l'assigner à une macro.`;
   S.macros.forEach((m,mi)=>{
     const t=document.createElement("div"); t.className="mt"+(m.asg.length?"":" empty");
     const fd=document.createElement("div"); fd.className="fd"; fd.innerHTML=`<div class="fdf" style="height:${m.v*100}%"></div>`;
@@ -571,7 +583,7 @@ function renderMacros(){
     m.asg.forEach((s,si)=>{
       const b=S.bands.find(x=>x.id===s.id); if(!b) return;
       const row=document.createElement("div"); row.className="as";
-      const lab=document.createElement("span"); lab.className="al"; lab.textContent=`B${S.bands.indexOf(b)+1} ${PL[s.p]}`; lab.title=`${TYPES[b.type].n}, ${PL[s.p]}`;
+      const lab=document.createElement("span"); lab.className="al"; lab.textContent=`B${b.id} ${PL[s.p]}`; lab.title=`${TYPES[b.type].n}, ${PL[s.p]}`;
       const mk=k=>{ const x=document.createElement("button"); x.className="vb"; valueBox(x,{get:()=>s[k],set:v=>{s[k]=v; applyMacro(m);},fmt:()=>fmtP(s.p,s[k]),drag:dragP(s.p),def:s[k]}); return x; };
       const arrow=document.createElement("span"); arrow.textContent="→";
       const del=document.createElement("button"); del.className="x"; del.textContent="✕"; del.title="Retirer"; del.onclick=()=>{ pushUndo(); m.asg.splice(si,1); renderMacros(); };
@@ -600,24 +612,8 @@ function refresh(light){
   $("hint").hidden=S.bands.length>0;
   if(!light) buildPanel(); else placePanel();
   syncUndo();
+  if(typeof bridgePush==="function") bridgePush();
 }
 let last=performance.now();
 function loop(now){ T+=(now-last)/1000; last=now; stepSpectrum(); draw(); drawMeter(); requestAnimationFrame(loop); }
 
-/* bandes de départ : coupe-bas Side à 120 Hz (cas type du cahier des charges) et une cloche dynamique sur la basse */
-S.bands.push({id:S.nextId++,type:"lowcut",freq:120,gain:0,q:0.71,slope:24,place:"side",on:true,dyn:false,range:0});
-S.bands.push({id:S.nextId++,type:"bell",freq:80,gain:0,q:2,slope:12,place:"st",on:true,dyn:true,range:-8});
-S.bands.push({id:S.nextId++,type:"highshelf",freq:9000,gain:2.5,q:0.71,slope:12,place:"st",on:true,dyn:false,range:0});
-S.macros[0]={name:"Filtre dub",v:0,asg:[{id:1,p:"freq",a:120,b:900},{id:1,p:"q",a:0.71,b:2.5}]}; // macro de démonstration
-S.sel=2; // la cloche dynamique est sélectionnée au départ pour montrer le panneau
-resize(); refresh(); requestAnimationFrame(loop);
-/* aide à la vérification : #presets, #macros, #preset=Bass:2 (catégorie:indice), #macroValue=50 */
-(function(){
-  const h=decodeURIComponent(location.hash.slice(1)); if(!h) return;
-  const m=h.match(/preset=(\w+):(\d+)/); if(m) applyPreset(m[1],+m[2]);
-  const sm=h.match(/selidx=(\d+)/); if(sm&&S.bands[+sm[1]]){ S.sel=S.bands[+sm[1]].id; refresh(); }
-  if(/macros/.test(h)){ setView("macros"); const mv=h.match(/macroValue=(\d+)/); if(mv){ S.macros.forEach(x=>{ if(x.asg.length){ x.v=+mv[1]/100; applyMacro(x); } }); renderMacros(); } }
-  if(/presets/.test(h)) togglePresets();
-  if(/popan/.test(h)) togglePop("pAn",$("anBtn"));
-  if(/pophelp/.test(h)) togglePop("pHelp",$("helpBtn"));
-})();

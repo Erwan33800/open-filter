@@ -61,11 +61,20 @@ scripts/install.ps1
 docs/               spec.md, backlog.md
 ```
 
-### Pont interface <-> plugin (à détailler à l'étape 3)
+### Pont interface <-> plugin (fait)
 
-- Page vers plugin : gestes sur la courbe via `beginChangeGesture` / `setValueNotifyingHost` / `endChangeGesture`, pour que Live enregistre l'automation proprement.
-- Plugin vers page : valeurs des paramètres, spectre réduit (~30 Hz), niveaux du vumètre.
-- La réponse en fréquence affichée est calculée en JS avec les mêmes formules que `FilterDesign` ; un test vérifie la concordance.
+Événement JUCE unique `openfilter`, tableau `[commande, ...arguments]`. Code : `ui/src/bridge.js` (page) et `Source/PluginEditor.cpp` (plugin).
+
+- **Page -> plugin** : `ready` (page chargée) ; `begin <id>` ; `set <id> <valeur>` ; `end <id>` ; `ui <json>` (réglages d'interface à sauvegarder).
+- **Plugin -> page** : `snapshot {id: valeur} <json>` (état complet, en réponse à `ready`) ; `params [[id, valeur], ...]` (changements venus de l'hôte).
+- Les valeurs sont les **vraies valeurs** des paramètres (Hz, dB, index de choix, 0/1), jamais normalisées : le plugin convertit avec `convertTo0to1`.
+- **Gestes d'automation** : pendant un glisser (bouton enfoncé), chaque paramètre touché ouvre un geste (`begin`) qui se referme au relâchement (`end`) ; molette et menus envoient `begin/set/end` d'un coup. Le plugin appelle `beginChangeGesture` / `setValueNotifyingHost` / `endChangeGesture`. Si la fenêtre se ferme en plein geste, les gestes ouverts sont refermés.
+- **Pas d'écho** : le plugin surveille les 419 valeurs atomiques à 30 Hz (pas d'écouteur) et ne renvoie à la page que ce qu'elle ne connaît pas déjà. Avant le `snapshot`, la page ne pousse rien (elle écraserait l'état sauvegardé).
+- **Cases fixes** : une bande est identifiée par sa case (1 à 24), comme « B3 » dans Live ; un preset occupe les cases 1 à n et libère les autres.
+- **Macros** : les valeurs `macro1` à `macro8` sont des paramètres ; leurs assignations vivent dans l'état d'interface (JSON). Une macro agit en réécrivant les paramètres qu'elle pilote, **donc seulement quand la fenêtre est ouverte** : limite connue, voir `docs/backlog.md` (moteur de macros en C++, modulation par-dessus les valeurs de base).
+- Réglages d'interface sauvegardés : échelle de gain, analyseur (spectres, retombée, plage, inclinaison), nom du preset, noms et assignations des macros.
+- **Test** : `python tests/ui/bridge_test.py` charge la page dans Chrome avec un faux `window.__JUCE__` (28 vérifications : état restauré, gestes, automation de l'hôte, presets, macros, pas d'écho).
+- La réponse en fréquence affichée est encore calculée en JS avec le RBJ simple : à aligner sur `FilterDesign` (étape 7), avec un test de concordance.
 
 ## Règles du thread audio (non négociables)
 

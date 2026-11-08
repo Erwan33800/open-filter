@@ -17,6 +17,18 @@ jobs:
       - name: Tests
         run: ctest --test-dir build-tests --output-on-failure
 
+  # Interface : la page générée est à jour, et le pont avec le plugin fonctionne (faux plugin dans Chrome).
+  ui-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: La page générée est à jour
+        run: |
+          python3 ui/build_ui.py
+          git diff --exit-code ui/openfilter_ui.html || (echo "ui/openfilter_ui.html n'est pas à jour : lance python ui/build_ui.py et commite le résultat" && exit 1)
+      - name: Test du pont interface / plugin
+        run: python3 tests/ui/bridge_test.py
+
   windows:
     runs-on: windows-2022
     permissions:
@@ -84,7 +96,7 @@ jobs:
   release:
     # Publie les fichiers prêts à installer sur la page « Releases » du dépôt (version « latest »)
     if: github.ref == 'refs/heads/main'
-    needs: [dsp-tests, windows, macos]
+    needs: [dsp-tests, ui-tests, windows, macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write
